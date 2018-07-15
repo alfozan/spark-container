@@ -1,15 +1,15 @@
 FROM ubuntu:18.04 as build
 
 LABEL maintainer="Abdul Alfozan https://github.com/alfozan"
-LABEL description="Build Spark 2.3 distribution with Hadoop and S3 support"
+LABEL description="Build Spark 2.3 distribution with Hadoop 2.8 and S3 support"
 
 RUN apt-get update && apt-get install -y locales && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 ENV LANG=en_US.utf8
 
-# Python
+# Python pip
 RUN apt-get install -y git python-pip
 
-# JAVA 8
+# Oracle Java 8 (JDK)
 RUN apt-get install -y software-properties-common \
   && echo y | add-apt-repository ppa:webupd8team/java \
   && apt-get update \
@@ -17,14 +17,14 @@ RUN apt-get install -y software-properties-common \
   && apt-get install -y oracle-java8-installer
 ENV JAVA_HOME=/usr/lib/jvm/java-8-oracle
 
-# SPARK clone
+# clone Spark 2.3 source
 ARG SPARK_VERSION=2.3.0
 ARG HADOOP_VERSION=2.8.3
 ARG SPARK_PACKAGE=spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
 ENV SPARK_HOME="/spark"
 RUN git clone --branch "v${SPARK_VERSION}" --single-branch --depth=1 https://github.com/apache/spark.git ${SPARK_HOME}
 
-# R
+# Install R packages for sparkr support
 RUN DEBIAN_FRONTEND=noninteractive apt-get install tzdata -y
 RUN apt-get install r-base -y
 RUN apt-get install texlive-latex-base texlive-fonts-recommended -y
@@ -46,16 +46,16 @@ RUN  wget -P ${SPARK_PACKAGE}/jars/ http://central.maven.org/maven2/org/apache/h
   && wget -P ${SPARK_PACKAGE}/jars/ http://central.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar
 
 
-
+# create runtime image
 FROM ubuntu:18.04
 
 RUN apt-get update && apt-get install -y locales && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 ENV LANG=en_US.utf8
 
-# Python
+# Python3 pip
 RUN apt-get install -y python3-pip
 
-# JAVA 8
+# Oracle Java 8 (JDK)
 RUN apt-get install -y software-properties-common \
   && echo y | add-apt-repository ppa:webupd8team/java \
   && apt-get update \
@@ -69,6 +69,8 @@ ARG SPARK_PACKAGE="spark-2.3.0-bin-hadoop2.8.3"
 WORKDIR ${SPARK_HOME}
 # copy Spark distribution from build image
 COPY --from=build "${SPARK_HOME}/${SPARK_PACKAGE}" .
+# fix permissions
+RUN chmod a+rw -R ${SPARK_HOME}
 
 # clean up
 RUN apt-get clean && apt-get autoremove
